@@ -48,8 +48,6 @@ jobs:
             --name medibridge-gateway-service \
             -p 8080:8080 \
             -e SERVER_PORT="${{ secrets.SERVER_PORT }}" \
-            
             -e EUREKA_SERVER_URL="${{ secrets.EUREKA_SERVER_URL }}" \
-        
             --restart unless-stopped \
             ${{ env.DOCKER_IMAGE }}:latest
