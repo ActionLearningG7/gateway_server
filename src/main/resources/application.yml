@@ -7,22 +7,54 @@ spring:
         locator:
           enabled: true
           lower-case-service-id: true
+      default-filters:
+        - name: JwtAuthenticationFilter
+        - name: RateLimitingFilter
+          args:
+            requestsPerMinute: 1000
       routes:
         # User Service Routes
         - id: user-service
           uri: lb://user-service
           predicates:
-            - Path=/api/v1/users/**
+            - Path=/api/v1/users/**,/api/v1/admin/**,/api/v1/doctors/**
           filters:
             - StripPrefix=0
             - RemoveRequestHeader=X-Forwarded-Host
             - RemoveRequestHeader=X-Forwarded-Proto
             - RemoveRequestHeader=X-Forwarded-Port
+            - name: JwtAuthenticationFilter
+            - name: RateLimitingFilter
+              args:
+                requestsPerMinute: 500
+
+        # Reservation Service Routes
+        - id: reservation-service
+          uri: lb://reservation-service
+          predicates:
+            - Path=/api/v1/reservations/**,/api/v1/appointments/**,/api/v1/queue/**
+          filters:
+            - StripPrefix=0
+            - RemoveRequestHeader=X-Forwarded-Host
+            - RemoveRequestHeader=X-Forwarded-Proto
+            - RemoveRequestHeader=X-Forwarded-Port
+            - name: JwtAuthenticationFilter
+            - name: RateLimitingFilter
+              args:
+                requestsPerMinute: 800
+
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY}
+      expiration: ${JWT_EXPIRATION_MS}
+      refresh-token:
+        expiration: 604800000 # 7 days
 
 eureka:
   client:
     service-url:
-      defaultZone: ${EUREKA_SERVER_URL}
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
     register-with-eureka: true
     fetch-registry: true
 
@@ -31,5 +63,36 @@ eureka:
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 30
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,routes,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    gateway:
+      enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  simple:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.medibridge: DEBUG
+    org.springframework.cloud.netflix.eureka: INFO
+    org.springframework.security: INFO
+    com.medibridge.apigateway_service: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{correlationId}] - %msg%n"
+
 server:
-  port: ${SERVER_PORT}
+  port: ${SERVER_PORT:8080}
